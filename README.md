@@ -268,10 +268,10 @@ npm run dev
 ### 빌드 명령어
 
 ```bash
-npm run build        # TypeScript 컴파일
-npm run bundle       # 일반 번들 (23MB)
-npm run bundle:min   # 압축 번들 (9.4MB)
-npm run build:all    # 전체 빌드
+npm run dev          # 개발 모드 실행
+npm run build        # 압축 번들 빌드
+npm run typecheck    # TypeScript 타입 체크
+npm run lint         # ESLint 코드 검사
 ```
 
 ### 프로젝트 구조
