@@ -4,6 +4,7 @@ dist/*
 !dist/team-epic-mcp.min.js
 .env
 .env.local
+.npmrc
 *.log
 .DS_Store
 .vscode/

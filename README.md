@@ -11,11 +11,36 @@ Epic 기반 팀 프로젝트 관리를 위한 MCP(Model Context Protocol) 서버
 - **자연어 쿼리**: AI가 이해하기 쉬운 형태로 데이터 제공
 - **블로커 관리**: 프로젝트 장애 요소 추적 및 해결 관리
 
-## 🚀 빠른 시작 (GitHub Raw 배포)
+## 🚀 빠른 시작
 
-### Claude Desktop 설정
+### Option 1: NPM 설치 (권장)
 
-가장 간단한 방법은 GitHub에서 직접 배포된 번들을 사용하는 것입니다:
+가장 간단한 방법은 npm을 통한 설치입니다:
+
+```bash
+# npx를 통한 실행
+npx team-epic-mcp@latest
+```
+
+Claude Desktop 설정:
+```json
+{
+  "mcpServers": {
+    "team-epic": {
+      "command": "npx",
+      "args": ["team-epic-mcp@latest"],
+      "env": {
+        "SPREADSHEET_ID": "your-spreadsheet-id",
+        "GOOGLE_SERVICE_ACCOUNT_BASE64": "your-base64-encoded-service-account"
+      }
+    }
+  }
+}
+```
+
+### Option 2: GitHub Raw 배포
+
+GitHub에서 직접 배포된 번들을 사용:
 
 ```json
 {
@@ -34,8 +59,9 @@ Epic 기반 팀 프로젝트 관리를 위한 MCP(Model Context Protocol) 서버
 
 ### 배포 파일 옵션
 
-- **압축 버전 (권장)**: `team-epic-mcp.min.js` (9.4MB)
-- **일반 버전**: `team-epic-mcp.js` (23MB)
+- **NPM 패키지**: `npx team-epic-mcp@latest` (자동 업데이트)
+- **압축 번들**: `team-epic-mcp.min.js` (9.4MB)
+- **일반 번들**: `team-epic-mcp.js` (23MB)
 
 ## 📋 Google Sheets 설정
 

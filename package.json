@@ -1,8 +1,11 @@
 {
-  "name": "team-visibility-mcp",
+  "name": "team-epic-mcp",
   "version": "1.0.0",
   "description": "MCP server for team project visibility using Google Sheets",
-  "main": "dist/index.js",
+  "main": "dist/team-epic-mcp.js",
+  "bin": {
+    "team-epic-mcp": "./dist/team-epic-mcp.js"
+  },
   "scripts": {
     "build": "tsc",
     "bundle": "esbuild src/index.ts --bundle --outfile=dist/team-epic-mcp.js --platform=node --target=node18 --format=cjs",
