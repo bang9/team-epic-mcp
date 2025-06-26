@@ -1,0 +1,39 @@
+{
+  "name": "team-visibility-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for team project visibility using Google Sheets",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "bundle": "esbuild src/index.ts --bundle --outfile=dist/team-epic-mcp.js --platform=node --target=node18 --format=cjs",
+    "bundle:min": "esbuild src/index.ts --bundle --outfile=dist/team-epic-mcp.min.js --platform=node --target=node18 --format=cjs --minify",
+    "build:all": "npm run build && npm run bundle",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/**/*.ts"
+  },
+  "keywords": [
+    "mcp",
+    "team",
+    "project",
+    "google-sheets"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "axios": "^1.6.7",
+    "csv-parse": "^5.5.3",
+    "googleapis": "^134.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.19",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "esbuild": "^0.25.5",
+    "eslint": "^8.56.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}

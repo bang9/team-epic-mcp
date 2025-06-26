@@ -1,0 +1,7 @@
+epic_id,ios_progress,android_progress,js_progress,overall_status,last_comment,last_updated,updated_by
+PROJ-001,70,50,80,development,JS 개발 거의 완료. 내일 PR 예정,2024-01-25T10:30:00Z,@Carol Lee
+PROJ-002,10,5,15,planning,API 스펙 검토 중. 백엔드 팀과 미팅 필요,2024-01-24T15:20:00Z,@Alice Kim
+PROJ-003,100,100,100,code_review,모든 플랫폼 개발 완료. 코드 리뷰 진행 중,2024-01-25T09:00:00Z,@Grace Wilson
+PROJ-004,95,90,95,testing,QA 테스트 진행 중. 몇 가지 엣지 케이스 발견,2024-01-25T14:45:00Z,@David Park
+PROJ-005,0,0,0,on_hold,우선순위 조정으로 일시 중단,2024-01-20T11:00:00Z,@Alice Kim
+PROJ-006,5,0,10,kickoff,킥오프 미팅 완료. 다음 주 기획 시작,2024-01-25T16:00:00Z,@Grace Wilson
