@@ -1,30 +1,43 @@
 # Team Epic MCP Server
 
-Jira Epic 기반으로 팀 프로젝트를 관리하는 MCP(Model Context Protocol) 서버입니다. Google Sheets를 백엔드로 사용하여 읽기/쓰기가 가능합니다.
+Epic 기반 팀 프로젝트 관리를 위한 MCP(Model Context Protocol) 서버입니다. Google Sheets를 백엔드로 사용하여 실시간 협업과 프로젝트 추적이 가능합니다.
 
-## 주요 기능
+## ✨ 주요 기능
 
-- **Epic 관리**: Jira Epic 기반 프로젝트 추적
-- **플랫폼별 진행률**: iOS, Android, JS 각 플랫폼별 진행 상황 관리
+- **Epic 라이프사이클 관리**: backlog → kickoff → planning → development → code_review → testing → ready_to_release → released → done
+- **플랫폼별 진행률 추적**: iOS, Android, JS 각 플랫폼별 진행 상황 관리
 - **실시간 업데이트**: 진행률, 코멘트, 블로커 등 실시간 업데이트
 - **히스토리 추적**: 모든 변경사항 자동 기록
 - **자연어 쿼리**: AI가 이해하기 쉬운 형태로 데이터 제공
+- **블로커 관리**: 프로젝트 장애 요소 추적 및 해결 관리
 
-## 설치 방법
+## 🚀 빠른 시작 (GitHub Raw 배포)
 
-1. 프로젝트 클론 및 의존성 설치:
-```bash
-git clone <repository-url>
-cd team-mcp
-npm install
+### Claude Desktop 설정
+
+가장 간단한 방법은 GitHub에서 직접 배포된 번들을 사용하는 것입니다:
+
+```json
+{
+  "mcpServers": {
+    "team-epic": {
+      "command": "node",
+      "args": ["https://raw.githubusercontent.com/bang9/team-epic-mcp/main/dist/team-epic-mcp.min.js"],
+      "env": {
+        "SPREADSHEET_ID": "your-spreadsheet-id",
+        "GOOGLE_SERVICE_ACCOUNT_BASE64": "your-base64-encoded-service-account"
+      }
+    }
+  }
+}
 ```
 
-2. 빌드:
-```bash
-npm run build
-```
+### 배포 파일 옵션
 
-## Google Sheets 설정
+- **압축 버전 (권장)**: `team-epic-mcp.min.js` (9.4MB)
+- **일반 버전**: `team-epic-mcp.js` (23MB)
+
+## 📋 Google Sheets 설정
 
 ### 1. 스프레드시트 구조
 
@@ -45,33 +58,19 @@ epic_id | ios_progress | android_progress | js_progress | overall_status | last_
 timestamp | epic_id | update_type | platform | message | author
 ```
 
-
 ### 2. 샘플 데이터
 
 `sheets_data` 폴더의 CSV 파일들을 Google Sheets에 복사하여 시작할 수 있습니다.
 
-### 3. Google Service Account 설정 (쓰기 권한 필요)
-
-Google Sheets API의 쓰기 작업을 위해서는 Service Account 인증이 필요합니다.
+### 3. Google Service Account 설정
 
 #### Service Account 생성
 
 1. [Google Cloud Console](https://console.cloud.google.com/)에 접속
 2. 프로젝트 선택 또는 새 프로젝트 생성
-3. 좌측 메뉴에서 "IAM 및 관리자" > "서비스 계정" 선택
-4. "서비스 계정 만들기" 클릭
-5. 서비스 계정 이름 입력 (예: "team-mcp-service")
-6. "만들기 및 계속" 클릭
-7. 역할은 건너뛰고 "계속" 클릭
-8. "완료" 클릭
-
-#### JSON 키 파일 생성
-
-1. 생성된 서비스 계정 클릭
-2. "키" 탭으로 이동
-3. "키 추가" > "새 키 만들기" 클릭
-4. JSON 형식 선택 후 "만들기"
-5. JSON 파일이 자동으로 다운로드됨
+3. APIs & Services > Credentials > Create Credentials > Service Account
+4. 서비스 계정 이름 입력 (예: "team-mcp-service")
+5. JSON 키 파일 다운로드
 
 #### 스프레드시트 권한 설정
 
@@ -79,193 +78,108 @@ Google Sheets API의 쓰기 작업을 위해서는 Service Account 인증이 필
 2. 우측 상단 "공유" 버튼 클릭
 3. Service Account 이메일 추가 (예: team-mcp-service@project-id.iam.gserviceaccount.com)
 4. "편집자" 권한 부여
-5. "보내기" 클릭
 
 #### Base64 인코딩
 
 ```bash
 # Linux/Mac
-cat service-account-key.json | base64
-
-# 또는 줄바꿈 없이 인코딩 (권장)
 cat service-account-key.json | base64 -w 0  # Linux
 cat service-account-key.json | base64 -b 0  # Mac
+
+# Windows (PowerShell)
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("service-account-key.json"))
 ```
 
-## MCP 서버 설정
+## 🛠️ 사용 가능한 도구
 
-### Claude Desktop 설정
+### 읽기 도구 (6개)
 
-`claude_desktop_config.json`:
+| 도구 | 설명 | 예시 |
+|------|------|------|
+| `list_epics` | Epic 목록 조회 | "현재 development 상태인 Epic들 보여줘" |
+| `get_epic_details` | Epic 상세 정보 조회 | "PROJ-123 Epic의 상세 정보와 진행 상황" |
+| `get_epic_timeline` | Epic 히스토리 조회 | "PROJ-123의 모든 업데이트 내역 보여줘" |
+| `get_team_progress` | 팀 전체 진행 현황 | "팀 전체 진행 상황 요약해줘" |
+| `find_blockers` | 블로커 찾기 | "현재 블로커가 있는 Epic들 찾아줘" |
+| `search_by_assignee` | 담당자별 Epic 검색 | "@Alice Kim이 iOS 담당인 Epic들" |
 
-```json
-{
-  "mcpServers": {
-    "team-epic": {
-      "command": "node",
-      "args": ["/path/to/team-mcp/dist/index.js"],
-      "env": {
-        "SPREADSHEET_ID": "your-spreadsheet-id",
-        "GOOGLE_SERVICE_ACCOUNT_BASE64": "base64로 인코딩된 Service Account JSON"
-      }
-    }
-  }
-}
+### 쓰기 도구 (7개)
+
+| 도구 | 설명 | 예시 |
+|------|------|------|
+| `create_epic` | 새 Epic 생성 | "새 Epic 생성: '[Mobile App] Push Notification' iOS는 @Alice, Android는 @Bob" |
+| `update_progress` | 진행률 업데이트 | "PROJ-123의 iOS 진행률을 80%로 업데이트" |
+| `add_comment` | 코멘트 추가 | "PROJ-123에 'API 연동 완료, UI 테스트 진행 중' 코멘트 추가" |
+| `report_blocker` | 블로커 등록 | "PROJ-123 Android에 'RecyclerView 성능 이슈' 블로커 등록" |
+| `resolve_blocker` | 블로커 해결 | "PROJ-123 Android 블로커를 'DiffUtil 적용으로 해결' 처리" |
+| `change_epic_status` | Epic 상태 변경 | "PROJ-123을 testing 상태로 변경" |
+| `mark_platform_done` | 플랫폼 완료 처리 | "PROJ-123의 iOS 개발 완료 처리" |
+
+## 💬 사용 예시
+
+### AI와의 자연어 대화
+
+```
+사용자: "우리 팀에서 현재 블로커가 있는 프로젝트가 있어?"
+AI: [find_blockers 도구 사용] 
+    "현재 2개의 Epic에서 블로커가 발견되었습니다:
+     - PROJ-001: Android RecyclerView 성능 이슈
+     - PROJ-003: iOS 메모리 누수 문제"
+
+사용자: "PROJ-001의 Android 블로커를 DiffUtil 적용으로 해결했어"
+AI: [resolve_blocker 도구 사용]
+    "PROJ-001의 Android 블로커가 해결 처리되었습니다."
+
+사용자: "@Alice Kim이 담당하고 있는 프로젝트들의 진행 상황은?"
+AI: [search_by_assignee 도구 사용]
+    "Alice Kim님이 담당 중인 프로젝트 현황..."
+```
+
+## 🏗️ 로컬 개발 설정
+
+### 프로젝트 클론 및 설치
+
+```bash
+git clone https://github.com/bang9/team-epic-mcp.git
+cd team-epic-mcp
+npm install
+```
+
+### 개발 명령어
+
+```bash
+# 개발 모드 실행
+npm run dev
+
+# 타입 체크
+npm run typecheck
+
+# 빌드
+npm run build
+
+# 번들 생성
+npm run bundle        # 일반 번들
+npm run bundle:min    # 압축 번들
+npm run build:all     # 전체 빌드
 ```
 
 ### 환경 변수
 
 ```bash
-# 필수: 스프레드시트 ID
+# 필수: 스프레드시트 ID (Google Sheets URL에서 추출)
 export SPREADSHEET_ID="your-spreadsheet-id"
 
-# 필수: Service Account (쓰기 권한이 필요한 경우)
+# 필수: Service Account 인증 (쓰기 작업용)
 export GOOGLE_SERVICE_ACCOUNT_BASE64="base64-encoded-json"
 
-# 선택: 캐시 시간 (기본값: 60000ms)
+# 선택: 캐시 시간 (기본값: 60초)
 export CACHE_DURATION="60000"
 ```
 
-## 사용 가능한 도구
-
-### 읽기 도구 (6개)
-
-#### 1. `list_epics`
-Epic 목록을 조회합니다.
+## 📁 프로젝트 구조
 
 ```
-예시: "현재 development 상태인 Epic들 보여줘"
-      "@Airen Kang가 담당하는 Epic 목록"
-```
-
-#### 2. `get_epic_details`
-특정 Epic의 상세 정보와 최근 업데이트를 조회합니다.
-
-```
-예시: "AA-3617 Epic의 상세 정보와 진행 상황"
-```
-
-#### 3. `get_epic_timeline`
-Epic의 전체 히스토리를 시간순으로 조회합니다.
-
-```
-예시: "AA-3617의 모든 업데이트 내역 보여줘"
-```
-
-#### 4. `get_team_progress`
-팀 전체의 진행 현황을 요약합니다.
-
-```
-예시: "팀 전체 진행 상황 요약해줘"
-```
-
-
-#### 6. `find_blockers`
-해결되지 않은 블로커를 찾습니다.
-
-```
-예시: "현재 블로커가 있는 Epic들 찾아줘"
-```
-
-#### 7. `search_by_assignee`
-담당자별 Epic을 검색합니다.
-
-```
-예시: "@John Kim이 Android 담당인 Epic들"
-```
-
-### 쓰기 도구 (7개)
-
-#### 1. `create_epic` 🆕
-새로운 Epic을 생성합니다.
-
-```
-예시: "새 Epic 생성: '[AI Agent Client] Real-time sync' iOS는 @Airen Kang, Android는 @John Kim, JS는 @Sarah Lee가 담당, 2월 1일 시작해서 3월 15일까지"
-```
-
-필수 정보:
-- Epic 이름
-- iOS/Android/JS 담당자 (@로 시작)
-- 시작일과 목표일 (YYYY-MM-DD 형식)
-
-#### 2. `update_progress` ⭐
-플랫폼별 진행률을 업데이트합니다.
-
-```
-예시: "AA-3617의 iOS 진행률을 80%로 업데이트"
-```
-
-#### 3. `add_comment` ⭐
-현재 상황에 대한 코멘트를 추가합니다.
-
-```
-예시: "AA-3617에 'API 연동 완료, UI 테스트 진행 중' 코멘트 추가"
-```
-
-#### 4. `report_blocker`
-블로커를 등록합니다.
-
-```
-예시: "AA-3617 Android에 'RecyclerView 성능 이슈' 블로커 등록"
-```
-
-#### 5. `resolve_blocker`
-블로커를 해결 처리합니다.
-
-```
-예시: "AA-3617 Android 블로커를 'DiffUtil 적용으로 해결' 처리"
-```
-
-#### 6. `change_epic_status`
-Epic의 전체 상태를 변경합니다.
-
-```
-예시: "AA-3617을 testing 상태로 변경"
-```
-
-#### 7. `mark_platform_done`
-특정 플랫폼을 완료 처리합니다.
-
-```
-예시: "AA-3617의 iOS 개발 완료 처리"
-```
-
-
-## 사용 예시
-
-### AI와의 대화
-
-1. **진행 상황 업데이트**
-   ```
-   사용자: "AA-3617의 iOS 개발이 90% 완료됐어. UI 테스트만 남았어"
-   AI: [update_progress 도구 사용하여 업데이트]
-   ```
-
-2. **팀 현황 파악**
-   ```
-   사용자: "우리 팀 전체 상황이 어떻게 되고 있어?"
-   AI: [get_team_progress 도구 사용하여 요약 제공]
-   ```
-
-3. **블로커 관리**
-   ```
-   사용자: "AA-3617 Android에서 메모리 누수 문제가 발생했어"
-   AI: [report_blocker 도구 사용하여 블로커 등록]
-   ```
-
-
-## Epic 상태 라이프사이클
-
-```
-backlog → kickoff → planning → development → code_review → testing → ready_to_release → released → done
-                                                                              ↓
-                                                                          on_hold
-```
-
-## 프로젝트 구조
-
-```
-team-mcp/
+team-epic-mcp/
 ├── src/
 │   ├── index.ts              # MCP 서버 진입점
 │   ├── config.ts             # 설정 관리
@@ -277,37 +191,46 @@ team-mcp/
 │       ├── epic-tools.ts     # 읽기 도구
 │       └── epic-write-tools.ts # 쓰기 도구
 ├── sheets_data/              # 샘플 CSV 데이터
-└── dist/                     # 빌드 결과물
+├── dist/                     # 배포 번들
+│   ├── team-epic-mcp.js      # 일반 번들 (23MB)
+│   └── team-epic-mcp.min.js  # 압축 번들 (9.4MB)
+└── README.md
 ```
 
-## 개발
+## 🔄 Epic 상태 라이프사이클
 
-```bash
-# 개발 모드 실행
-npm run dev
-
-# 타입 체크
-npm run typecheck
-
-# 린트
-npm run lint
+```
+backlog → kickoff → planning → development → code_review → testing → ready_to_release → released → done
+                                                                              ↓
+                                                                          on_hold
 ```
 
-## 문제 해결
+## 🚨 문제 해결
 
-### 쓰기가 안 되는 경우
-- 스프레드시트가 "편집자" 권한으로 공유되어 있는지 확인
-- 인터넷 연결 상태 확인
-- 콘솔에서 오류 메시지 확인
+### 쓰기 작업이 실패하는 경우
+- 스프레드시트가 Service Account에 "편집자" 권한으로 공유되어 있는지 확인
+- `GOOGLE_SERVICE_ACCOUNT_BASE64` 환경변수가 올바르게 설정되었는지 확인
+- Service Account JSON이 유효한지 확인
 
 ### 데이터가 업데이트되지 않는 경우
 - 캐시 시간(기본 1분) 때문일 수 있음
-- 강제로 새로고침이 필요한 경우 서버 재시작
+- 네트워크 연결 상태 확인
+- Google Sheets API 할당량 확인
 
-### API 제한
-- Google Sheets API는 무료로 사용 가능하지만 rate limit이 있음
-- 과도한 요청 시 일시적으로 차단될 수 있음
+### 환경변수 관련 오류
+- `SPREADSHEET_ID`가 올바른 Google Sheets ID인지 확인
+- Service Account 권한이 올바르게 설정되었는지 확인
 
-## 라이선스
+## 🔗 유용한 링크
 
-MIT
+- [MCP (Model Context Protocol)](https://modelcontextprotocol.io/)
+- [Google Sheets API 문서](https://developers.google.com/sheets/api)
+- [Google Cloud Service Account 설정](https://cloud.google.com/iam/docs/service-accounts)
+
+## 📄 라이선스
+
+MIT License
+
+---
+
+**🤖 Generated with [Claude Code](https://claude.ai/code)**
