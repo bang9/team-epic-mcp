@@ -60,6 +60,41 @@ export class GoogleSheetsClient {
       return this.cache;
     }
 
+    // Service Account가 있으면 batchGet 사용
+    if (this.auth) {
+      try {
+        // 한 번의 요청으로 모든 시트 데이터 가져오기
+        const response = await this.sheets.spreadsheets.values.batchGet({
+          spreadsheetId: CONFIG.SPREADSHEET_ID,
+          ranges: [
+            `${CONFIG.SHEET_NAMES.EPICS}!A:Z`,
+            `${CONFIG.SHEET_NAMES.EPIC_STATUS}!A:Z`,
+            `${CONFIG.SHEET_NAMES.STATUS_UPDATES}!A:Z`,
+          ],
+        });
+
+        const valueRanges = response.data.valueRanges || [];
+        
+        // 각 시트 데이터 파싱
+        const epics = this.parseSheetData<Epic>(valueRanges[0]?.values || []);
+        const epicStatuses = this.parseSheetData<EpicStatus>(valueRanges[1]?.values || []);
+        const statusUpdates = this.parseSheetData<StatusUpdate>(valueRanges[2]?.values || []);
+
+        this.cache = {
+          epics,
+          epicStatuses,
+          statusUpdates,
+        };
+        this.cacheTimestamp = now;
+
+        return this.cache;
+      } catch (error) {
+        console.error("Failed to batch fetch sheets:", error);
+        // 에러 시 개별 요청으로 폴백
+      }
+    }
+
+    // Service Account가 없거나 batchGet 실패 시 개별 요청
     const [epics, epicStatuses, statusUpdates] = await Promise.all([
       this.fetchSheet<Epic>("Epics", CONFIG.SHEET_GIDS.EPICS),
       this.fetchSheet<EpicStatus>("Epic_Status", CONFIG.SHEET_GIDS.EPIC_STATUS),
@@ -79,6 +114,31 @@ export class GoogleSheetsClient {
     return this.cache;
   }
 
+  private parseSheetData<T>(rows: any[][]): T[] {
+    if (rows.length === 0) return [];
+
+    // 첫 번째 행을 헤더로 사용
+    const headers = rows[0];
+    const records = rows.slice(1).map(row => {
+      const record: any = {};
+      headers.forEach((header: string, index: number) => {
+        let value = row[index] || '';
+        
+        // 타입 변환
+        if (['ios_progress', 'android_progress', 'js_progress'].includes(header)) {
+          value = parseInt(value) || 0;
+        } else if (header === 'is_carry_over') {
+          value = value.toString().toLowerCase() === 'true';
+        }
+        
+        record[header] = value;
+      });
+      return record;
+    });
+
+    return records as T[];
+  }
+
   private async fetchSheet<T>(sheetName: string, gid: number): Promise<T[]> {
     try {
       // Service Account가 있으면 Sheets API 사용, 없으면 CSV export 사용
@@ -90,28 +150,7 @@ export class GoogleSheetsClient {
         });
 
         const rows = response.data.values || [];
-        if (rows.length === 0) return [];
-
-        // 첫 번째 행을 헤더로 사용
-        const headers = rows[0];
-        const records = rows.slice(1).map(row => {
-          const record: any = {};
-          headers.forEach((header: string, index: number) => {
-            let value = row[index] || '';
-            
-            // 타입 변환
-            if (['ios_progress', 'android_progress', 'js_progress'].includes(header)) {
-              value = parseInt(value) || 0;
-            } else if (header === 'is_carry_over') {
-              value = value.toString().toLowerCase() === 'true';
-            }
-            
-            record[header] = value;
-          });
-          return record;
-        });
-
-        return records as T[];
+        return this.parseSheetData<T>(rows);
       } else {
         // 기존 CSV export 방식 (읽기 전용)
         const url = getExportUrl(gid);

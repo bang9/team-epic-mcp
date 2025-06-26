@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/team-epic-mcp.js",
   "bin": {
-    "team-epic-mcp": "./dist/team-epic-mcp.min.js"
+    "team-epic-mcp": "dist/team-epic-mcp.min.js"
   },
   "scripts": {
     "dev": "tsx src/index.ts",
