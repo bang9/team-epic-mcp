@@ -41,7 +41,20 @@
       "Bash(git add:*)",
       "Bash(npm view:*)",
       "Bash(npm whoami:*)",
-      "Bash(npm publish:*)"
+      "Bash(npm publish:*)",
+      "Bash(SPREADSHEET_ID=\"1ABC123TEST\" GOOGLE_SERVICE_ACCOUNT_BASE64=\"eyJ0ZXN0IjoidGVzdCJ9\" npm run dev)",
+      "Bash(SPREADSHEET_ID=\"1ABC123TEST\" GOOGLE_SERVICE_ACCOUNT_BASE64=\"eyJ0ZXN0IjoidGVzdCJ9\" npx team-epic-mcp@latest)",
+      "Bash(chmod:*)",
+      "Bash(SPREADSHEET_ID=\"1ABC123TEST\" GOOGLE_SERVICE_ACCOUNT_BASE64=\"eyJ0ZXN0IjoidGVzdCJ9\" ./dist/team-epic-mcp.min.js)",
+      "Bash(npm link:*)",
+      "Bash(npx team-epic-mcp:*)",
+      "Bash(npm unlink:*)",
+      "mcp__team-epic__get_team_progress",
+      "mcp__team-epic__get_epic_timeline",
+      "mcp__team-epic__change_epic_status",
+      "mcp__team-epic__report_blocker",
+      "mcp__team-epic__resolve_blocker",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }

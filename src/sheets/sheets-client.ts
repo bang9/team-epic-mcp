@@ -81,31 +81,65 @@ export class GoogleSheetsClient {
 
   private async fetchSheet<T>(sheetName: string, gid: number): Promise<T[]> {
     try {
-      const url = getExportUrl(gid);
-      const response = await axios.get(url);
+      // Service Account가 있으면 Sheets API 사용, 없으면 CSV export 사용
+      if (this.auth) {
+        // Google Sheets API 사용
+        const response = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: CONFIG.SPREADSHEET_ID,
+          range: `${sheetName}!A:Z`, // 모든 열 읽기
+        });
 
-      const records = parse(response.data, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-        cast: (value, context) => {
-          // 숫자 변환
-          if (
-            context.column === "ios_progress" ||
-            context.column === "android_progress" ||
-            context.column === "js_progress"
-          ) {
-            return parseInt(value) || 0;
-          }
-          // boolean 변환
-          if (context.column === "is_carry_over") {
-            return value.toLowerCase() === "true";
-          }
-          return value;
-        },
-      });
+        const rows = response.data.values || [];
+        if (rows.length === 0) return [];
 
-      return records as T[];
+        // 첫 번째 행을 헤더로 사용
+        const headers = rows[0];
+        const records = rows.slice(1).map(row => {
+          const record: any = {};
+          headers.forEach((header: string, index: number) => {
+            let value = row[index] || '';
+            
+            // 타입 변환
+            if (['ios_progress', 'android_progress', 'js_progress'].includes(header)) {
+              value = parseInt(value) || 0;
+            } else if (header === 'is_carry_over') {
+              value = value.toString().toLowerCase() === 'true';
+            }
+            
+            record[header] = value;
+          });
+          return record;
+        });
+
+        return records as T[];
+      } else {
+        // 기존 CSV export 방식 (읽기 전용)
+        const url = getExportUrl(gid);
+        const response = await axios.get(url);
+
+        const records = parse(response.data, {
+          columns: true,
+          skip_empty_lines: true,
+          trim: true,
+          cast: (value, context) => {
+            // 숫자 변환
+            if (
+              context.column === "ios_progress" ||
+              context.column === "android_progress" ||
+              context.column === "js_progress"
+            ) {
+              return parseInt(value) || 0;
+            }
+            // boolean 변환
+            if (context.column === "is_carry_over") {
+              return value.toLowerCase() === "true";
+            }
+            return value;
+          },
+        });
+
+        return records as T[];
+      }
     } catch (error) {
       console.error(`Failed to fetch ${sheetName} sheet:`, error);
       return [];
