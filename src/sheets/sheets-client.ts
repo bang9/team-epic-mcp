@@ -73,7 +73,8 @@ class VersionManager {
     }
 
     try {
-      const metadata = await this.sheetsClient.fetchSheetData<MetadataRow>(CONFIG.SHEET_NAMES.METADATA, -1);
+      // 무한루프 방지: fetchSheetData 직접 호출 (마이그레이션 체크 없이)
+      const metadata = await this.sheetsClient.fetchSheet<MetadataRow>(CONFIG.SHEET_NAMES.METADATA, -1);
       const versionRow = metadata.find(row => row.key === "schema_version");
       
       const version = versionRow?.value || "1.0.2";
@@ -127,7 +128,8 @@ class VersionManager {
 
   private async upsertMetadata(key: string, value: string): Promise<void> {
     try {
-      const metadata = await this.sheetsClient.fetchSheetData<MetadataRow>(CONFIG.SHEET_NAMES.METADATA, -1);
+      // 무한루프 방지: fetchSheet 직접 호출 (마이그레이션 체크 없이)
+      const metadata = await this.sheetsClient.fetchSheet<MetadataRow>(CONFIG.SHEET_NAMES.METADATA, -1);
       const existingIndex = metadata.findIndex(row => row.key === key);
       
       const newRow = [key, value, new Date().toISOString()];
@@ -397,8 +399,6 @@ export class GoogleSheetsClient {
 
   // CSV 형식으로 읽기 (퍼블릭 읽기 전용)
   async fetchAllData(): Promise<SheetData> {
-    // 자동 마이그레이션 체크
-    await this.versionManager.checkAndMigrateIfNeeded();
     
     const now = Date.now();
     if (this.cache && now - this.cacheTimestamp < CONFIG.CACHE_DURATION) {
@@ -561,8 +561,6 @@ export class GoogleSheetsClient {
 
   // 쓰기 작업을 위한 메서드들
   async updateValues(range: string, values: any[][]): Promise<boolean> {
-    // 자동 마이그레이션 체크
-    await this.versionManager.checkAndMigrateIfNeeded();
     
     // Service Account가 없으면 오류 반환
     if (!this.auth) {
@@ -611,8 +609,6 @@ export class GoogleSheetsClient {
   }
 
   async appendValues(range: string, values: any[][]): Promise<boolean> {
-    // 자동 마이그레이션 체크
-    await this.versionManager.checkAndMigrateIfNeeded();
     
     // Service Account가 없으면 오류 반환
     if (!this.auth) {
@@ -720,8 +716,6 @@ export class GoogleSheetsClient {
   async addStatusUpdate(
     update: Omit<StatusUpdate, "timestamp">,
   ): Promise<boolean> {
-    // 자동 마이그레이션 체크
-    await this.versionManager.checkAndMigrateIfNeeded();
     
     try {
       const newRow = [
@@ -765,8 +759,6 @@ export class GoogleSheetsClient {
 
   // Epic 상태 변경
   async changeEpicStatus(epicId: string, newStatus: string): Promise<boolean> {
-    // 자동 마이그레이션 체크
-    await this.versionManager.checkAndMigrateIfNeeded();
     
     try {
       const data = await this.fetchAllData();
@@ -805,8 +797,6 @@ export class GoogleSheetsClient {
     initial_status?: string;
     author: string;
   }): Promise<string> {
-    // 자동 마이그레이션 체크
-    await this.versionManager.checkAndMigrateIfNeeded();
     
     try {
       // 1. Epic URL에서 Epic ID 추출
@@ -905,8 +895,6 @@ export class GoogleSheetsClient {
 
   // 특정 Epic의 히스토리 조회 (분기별 시트에서)
   async fetchEpicHistory(epicId: string): Promise<StatusUpdate[]> {
-    // 자동 마이그레이션 체크
-    await this.versionManager.checkAndMigrateIfNeeded();
     
     try {
       // Epic 정보 조회해서 created_quarter 확인
@@ -970,5 +958,10 @@ export class GoogleSheetsClient {
   clearCache() {
     this.cache = null;
     this.cacheTimestamp = 0;
+  }
+
+  // 서버 시작시 마이그레이션 체크용 public 메서드
+  async checkAndMigrateIfNeeded(): Promise<void> {
+    return this.versionManager.checkAndMigrateIfNeeded();
   }
 }
