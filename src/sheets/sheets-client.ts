@@ -633,8 +633,19 @@ export class GoogleSheetsClient {
 
         return records as T[];
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Failed to fetch ${sheetName} sheet:`, error);
+      
+      // 시트가 존재하지 않는 경우나 중요한 에러는 다시 throw하여 
+      // 상위 함수에서 적절히 처리할 수 있도록 함
+      if (error.message && (
+        error.message.includes('Unable to parse range') ||
+        error.message.includes('not found') ||
+        error.message.includes('does not exist')
+      )) {
+        throw error;
+      }
+      
       return [];
     }
   }
