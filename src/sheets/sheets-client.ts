@@ -81,24 +81,31 @@ class VersionManager {
       VersionManager.sheetVersionCache = version;
       return version;
     } catch (error) {
-      console.error("Failed to fetch _Metadata sheet:", error);
-      try {
-        // _Metadata 시트가 없으면 생성하고 기본 스키마 버전 주입
-        console.error("Creating _Metadata sheet and injecting initial schema version...");
-        await this.createMetadataSheet();
-        
-        // 생성 후 기본 버전(1.0.2)으로 설정하여 마이그레이션이 진행되도록 함
-        const initialVersion = "1.0.2";
-        VersionManager.sheetVersionCache = initialVersion;
-        
-        console.error(`_Metadata sheet created with initial schema version: ${initialVersion}`);
-        return initialVersion;
-      } catch (createError) {
-        console.error("Failed to create _Metadata sheet:", createError);
-        // 메타데이터 시트 생성에 실패해도 기본 버전으로 계속 진행
-        VersionManager.sheetVersionCache = "1.0.2";
-        return "1.0.2";
+      console.error("Failed to fetch Metadata sheet:", error);
+      
+      // 특정 에러인 경우에만 시트 생성 시도
+      const errorMessage = (error as any)?.message || '';
+      if (errorMessage.includes('Unable to parse range') || errorMessage.includes('not found')) {
+        console.error("Metadata sheet does not exist. Creating it now...");
+        try {
+          await this.createMetadataSheet();
+          
+          // 생성 후 기본 버전(1.0.2)으로 설정하여 마이그레이션이 진행되도록 함
+          const initialVersion = "1.0.2";
+          VersionManager.sheetVersionCache = initialVersion;
+          
+          console.error(`Metadata sheet created successfully with initial schema version: ${initialVersion}`);
+          return initialVersion;
+        } catch (createError) {
+          console.error("Failed to create Metadata sheet:", createError);
+          console.error("CreateError details:", JSON.stringify(createError, null, 2));
+        }
       }
+      
+      // 시트 생성 실패 또는 다른 에러인 경우 기본 버전으로 진행
+      console.error("Using default schema version 1.0.2 due to Metadata sheet issues");
+      VersionManager.sheetVersionCache = "1.0.2";
+      return "1.0.2";
     }
   }
 
