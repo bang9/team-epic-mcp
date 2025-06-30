@@ -83,29 +83,27 @@ class VersionManager {
     } catch (error) {
       console.error("Failed to fetch Metadata sheet:", error);
       
-      // 특정 에러인 경우에만 시트 생성 시도
-      const errorMessage = (error as any)?.message || '';
-      if (errorMessage.includes('Unable to parse range') || errorMessage.includes('not found')) {
-        console.error("Metadata sheet does not exist. Creating it now...");
-        try {
-          await this.createMetadataSheet();
-          
-          // 생성 후 기본 버전(1.0.2)으로 설정하여 마이그레이션이 진행되도록 함
-          const initialVersion = "1.0.2";
-          VersionManager.sheetVersionCache = initialVersion;
-          
-          console.error(`Metadata sheet created successfully with initial schema version: ${initialVersion}`);
-          return initialVersion;
-        } catch (createError) {
-          console.error("Failed to create Metadata sheet:", createError);
-          console.error("CreateError details:", JSON.stringify(createError, null, 2));
-        }
+      // Metadata 시트가 없는 경우 자동 생성
+      console.error("Metadata sheet does not exist. Creating it now...");
+      try {
+        await this.createMetadataSheet();
+        
+        // 생성 후 기본 버전(1.0.2)으로 설정하여 마이그레이션이 진행되도록 함
+        const initialVersion = "1.0.2";
+        VersionManager.sheetVersionCache = initialVersion;
+        
+        console.error(`Metadata sheet created successfully with initial schema version: ${initialVersion}`);
+        return initialVersion;
+      } catch (createError) {
+        console.error("Failed to create Metadata sheet:", createError);
+        console.error("CreateError details:", JSON.stringify(createError, null, 2));
+        
+        // 생성 실패 시에도 초기 버전 반환하여 마이그레이션 진행
+        const fallbackVersion = "1.0.2";
+        VersionManager.sheetVersionCache = fallbackVersion;
+        console.error(`Falling back to version ${fallbackVersion} to continue migration`);
+        return fallbackVersion;
       }
-      
-      // 시트 생성 실패 또는 다른 에러인 경우 기본 버전으로 진행
-      console.error("Using default schema version 1.0.2 due to Metadata sheet issues");
-      VersionManager.sheetVersionCache = "1.0.2";
-      return "1.0.2";
     }
   }
 
@@ -207,21 +205,34 @@ class VersionManager {
         await this.updateEpicQuarter(epic.epic_id, quarter);
       }
       
-      // 3. 필요한 분기별 시트들 생성
+      // 3. 필요한 분기별 시트들 생성 및 마이그레이션 상태 확인
       console.error("3. Creating quarterly Status_Updates sheets...");
       const requiredQuarters = [...new Set(quarterAssignments.values())];
+      let allSheetsAlreadyExist = true;
+      
       for (const quarter of requiredQuarters) {
         const sheetName = getStatusUpdatesSheetName(quarter);
-        await this.sheetsClient.createSheet(sheetName);
+        const exists = await this.sheetsClient.sheetExists(sheetName);
+        if (!exists) {
+          console.error(`Creating new sheet: ${sheetName}`);
+          await this.sheetsClient.createSheet(sheetName);
+          allSheetsAlreadyExist = false;
+        } else {
+          console.error(`Sheet already exists: ${sheetName}`);
+        }
       }
       
-      // 4. 모든 Status_Updates를 분기별로 이동
-      console.error("4. Migrating Status_Updates data to quarterly sheets...");
-      await this.migrateStatusUpdates(statusUpdates, quarterAssignments);
-      
-      // 5. 기존 Status_Updates 시트 비우기
-      console.error("5. Clearing legacy Status_Updates sheet...");
-      await this.clearStatusUpdatesSheet();
+      // 4. 데이터 마이그레이션 (새로 생성된 시트가 있는 경우에만)
+      if (!allSheetsAlreadyExist) {
+        console.error("4. Migrating Status_Updates data to quarterly sheets...");
+        await this.migrateStatusUpdates(statusUpdates, quarterAssignments);
+        
+        // 5. 기존 Status_Updates 시트 비우기
+        console.error("5. Clearing legacy Status_Updates sheet...");
+        await this.clearStatusUpdatesSheet();
+      } else {
+        console.error("4. All quarterly sheets already exist - skipping data migration");
+      }
       
       console.error("1.0.2 -> 1.1.0 migration completed successfully!");
       
@@ -814,7 +825,21 @@ export class GoogleSheetsClient {
       
       if (epic && epic.created_quarter) {
         // 마이그레이션 완료된 Epic: 해당 분기 시트 사용
-        return getStatusUpdatesSheetName(epic.created_quarter);
+        const quarterSheetName = getStatusUpdatesSheetName(epic.created_quarter);
+        
+        // 분기별 시트가 존재하는지 확인하고 없으면 생성
+        const exists = await this.sheetExists(quarterSheetName);
+        if (!exists) {
+          console.error(`Creating missing quarterly sheet: ${quarterSheetName}`);
+          await this.createSheet(quarterSheetName);
+          
+          // 헤더 추가
+          await this.updateValues(`${quarterSheetName}!A1:F1`, [
+            ["timestamp", "epic_id", "update_type", "platform", "message", "author"]
+          ]);
+        }
+        
+        return quarterSheetName;
       } else {
         // 기존 Epic 또는 마이그레이션 이전: 기존 시트 사용
         return CONFIG.SHEET_NAMES.STATUS_UPDATES;
@@ -983,6 +1008,26 @@ export class GoogleSheetsClient {
     } catch (error) {
       console.error(`Failed to fetch history for epic ${epicId}:`, error);
       return [];
+    }
+  }
+
+  // 시트 존재 여부 확인
+  async sheetExists(sheetName: string): Promise<boolean> {
+    if (!this.auth) {
+      // Service Account가 없으면 정확한 확인 불가, false 리턴
+      return false;
+    }
+
+    try {
+      const response = await this.sheets.spreadsheets.get({
+        spreadsheetId: CONFIG.SPREADSHEET_ID,
+      });
+      
+      const sheets = response.data.sheets || [];
+      return sheets.some(sheet => sheet.properties?.title === sheetName);
+    } catch (error) {
+      console.error(`Failed to check if sheet ${sheetName} exists:`, error);
+      return false;
     }
   }
 
