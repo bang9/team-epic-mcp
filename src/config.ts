@@ -14,7 +14,7 @@ export const CONFIG = {
     EPICS: "Epics",
     EPIC_STATUS: "Epic_Status",
     STATUS_UPDATES: "Status_Updates",
-    METADATA: "_Metadata",
+    METADATA: "Metadata",
   },
 
   // 시트 GID (Google Sheets의 고유 ID)

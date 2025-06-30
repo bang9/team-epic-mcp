@@ -89,7 +89,7 @@ class TeamVisibilityMCPServer {
     await this.server.connect(transport);
     console.error(`Team Epic MCP Server started`);
     console.error(`Connected to spreadsheet: ${CONFIG.SPREADSHEET_ID}`);
-    
+
     // 서버 시작시 마이그레이션 체크 한 번만 실행
     try {
       await this.sheetsClient.checkAndMigrateIfNeeded();
@@ -101,3 +101,5 @@ class TeamVisibilityMCPServer {
 
 const server = new TeamVisibilityMCPServer();
 server.start().catch(console.error);
+
+
