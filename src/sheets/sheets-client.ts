@@ -32,14 +32,14 @@ class VersionManager {
     const sheetVersion = await this.getSchemaVersion();
 
     if (this.needsMigration(sheetVersion, mcpVersion)) {
-      console.log(`Schema migration started: ${sheetVersion} -> ${mcpVersion}`);
+      console.error(`Schema migration started: ${sheetVersion} -> ${mcpVersion}`);
       
       await this.executeMigration(sheetVersion, mcpVersion);
       await this.updateSchemaVersion(mcpVersion);
       
       VersionManager.migrationComplete = true;
       
-      console.log(`Migration completed: ${sheetVersion} -> ${mcpVersion}`);
+      console.error(`Migration completed: ${sheetVersion} -> ${mcpVersion}`);
     }
   }
 
@@ -83,14 +83,14 @@ class VersionManager {
       console.error("Failed to fetch _Metadata sheet:", error);
       try {
         // _Metadata 시트가 없으면 생성하고 기본 스키마 버전 주입
-        console.log("Creating _Metadata sheet and injecting initial schema version...");
+        console.error("Creating _Metadata sheet and injecting initial schema version...");
         await this.createMetadataSheet();
         
         // 생성 후 기본 버전(1.0.2)으로 설정하여 마이그레이션이 진행되도록 함
         const initialVersion = "1.0.2";
         VersionManager.sheetVersionCache = initialVersion;
         
-        console.log(`_Metadata sheet created with initial schema version: ${initialVersion}`);
+        console.error(`_Metadata sheet created with initial schema version: ${initialVersion}`);
         return initialVersion;
       } catch (createError) {
         console.error("Failed to create _Metadata sheet:", createError);
@@ -169,19 +169,19 @@ class VersionManager {
     // 향후 다른 major/minor 버전 마이그레이션이 필요하면 여기에 추가
     // 예: if (from.major === 1 && from.minor === 1 && to.major === 1 && to.minor === 2) { ... }
     
-    console.log(`Schema migration completed from ${fromVersion} to ${toVersion}`);
+    console.error(`Schema migration completed from ${fromVersion} to ${toVersion}`);
   }
 
   private async migrate_1_0_2_to_1_1_0(): Promise<void> {
-    console.log("Starting 1.0.2 -> 1.1.0 migration...");
+    console.error("Starting 1.0.2 -> 1.1.0 migration...");
     
     try {
       // 1. Epics 시트에 created_quarter 컬럼 추가
-      console.log("1. Adding created_quarter column to Epics sheet...");
+      console.error("1. Adding created_quarter column to Epics sheet...");
       await this.addCreatedQuarterColumn();
       
       // 2. 기존 Epic들에 생성 분기 추정 및 할당
-      console.log("2. Assigning quarters to existing epics...");
+      console.error("2. Assigning quarters to existing epics...");
       const epics = await this.sheetsClient.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS, -1);
       const statusUpdates = await this.sheetsClient.fetchSheetData<StatusUpdate>(CONFIG.SHEET_NAMES.STATUS_UPDATES, -1);
       
@@ -194,7 +194,7 @@ class VersionManager {
       }
       
       // 3. 필요한 분기별 시트들 생성
-      console.log("3. Creating quarterly Status_Updates sheets...");
+      console.error("3. Creating quarterly Status_Updates sheets...");
       const requiredQuarters = [...new Set(quarterAssignments.values())];
       for (const quarter of requiredQuarters) {
         const sheetName = getStatusUpdatesSheetName(quarter);
@@ -202,14 +202,14 @@ class VersionManager {
       }
       
       // 4. 모든 Status_Updates를 분기별로 이동
-      console.log("4. Migrating Status_Updates data to quarterly sheets...");
+      console.error("4. Migrating Status_Updates data to quarterly sheets...");
       await this.migrateStatusUpdates(statusUpdates, quarterAssignments);
       
       // 5. 기존 Status_Updates 시트 비우기
-      console.log("5. Clearing legacy Status_Updates sheet...");
+      console.error("5. Clearing legacy Status_Updates sheet...");
       await this.clearStatusUpdatesSheet();
       
-      console.log("1.0.2 -> 1.1.0 migration completed successfully!");
+      console.error("1.0.2 -> 1.1.0 migration completed successfully!");
       
     } catch (error) {
       console.error("Migration failed:", error);
@@ -270,7 +270,7 @@ class VersionManager {
   }
 
   private async migrateStatusUpdates(statusUpdates: StatusUpdate[], quarterAssignments: Map<string, string>): Promise<void> {
-    console.log(`Processing ${statusUpdates.length} status updates for migration...`);
+    console.error(`Processing ${statusUpdates.length} status updates for migration...`);
     
     // 분기별로 그룹화
     const updatesByQuarter = new Map<string, StatusUpdate[]>();
@@ -288,7 +288,7 @@ class VersionManager {
     // 각 분기별 시트에 데이터 추가 (배치 처리로 메모리 사용량 최적화)
     for (const [quarter, updates] of updatesByQuarter) {
       const sheetName = getStatusUpdatesSheetName(quarter);
-      console.log(`Migrating ${updates.length} updates to ${sheetName}...`);
+      console.error(`Migrating ${updates.length} updates to ${sheetName}...`);
       
       // 헤더 먼저 추가
       await this.sheetsClient.updateValues(
@@ -316,7 +316,7 @@ class VersionManager {
         
         // 각 배치를 순차적으로 처리
         for (let i = 0; i < batches.length; i++) {
-          console.log(`Processing batch ${i + 1}/${batches.length} for ${sheetName}...`);
+          console.error(`Processing batch ${i + 1}/${batches.length} for ${sheetName}...`);
           await this.sheetsClient.appendValues(`${sheetName}!A:F`, batches[i]);
           
           // 메모리 정리를 위한 짧은 대기
@@ -327,7 +327,7 @@ class VersionManager {
       }
     }
     
-    console.log("Status updates migration completed.");
+    console.error("Status updates migration completed.");
   }
 
   private async clearStatusUpdatesSheet(): Promise<void> {
@@ -376,7 +376,7 @@ export class GoogleSheetsClient {
           scopes: ["https://www.googleapis.com/auth/spreadsheets"],
         });
 
-        console.log("Service Account authentication initialized successfully");
+        console.error("Service Account authentication initialized successfully");
       } catch (error) {
         console.error(
           "Failed to initialize Service Account authentication:",
@@ -622,8 +622,8 @@ export class GoogleSheetsClient {
     }
 
     try {
-      console.log("Attempting to append values to:", range);
-      console.log("Values to append:", JSON.stringify(values));
+      console.error("Attempting to append values to:", range);
+      console.error("Values to append:", JSON.stringify(values));
 
       const response = await this.sheets.spreadsheets.values.append({
         spreadsheetId: CONFIG.SPREADSHEET_ID,
@@ -634,8 +634,8 @@ export class GoogleSheetsClient {
         },
       });
 
-      console.log("Response status:", response.status);
-      console.log("Values appended successfully");
+      console.error("Response status:", response.status);
+      console.error("Values appended successfully");
 
       this.clearCache(); // 캐시 무효화
       return response.status === 200;
