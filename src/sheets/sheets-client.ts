@@ -31,7 +31,7 @@ class VersionManager {
     const mcpVersion = MCP_VERSION;
     const sheetVersion = await this.getSchemaVersion();
 
-    if (sheetVersion !== mcpVersion) {
+    if (this.needsMigration(sheetVersion, mcpVersion)) {
       console.log(`Schema migration started: ${sheetVersion} -> ${mcpVersion}`);
       
       await this.executeMigration(sheetVersion, mcpVersion);
@@ -41,6 +41,30 @@ class VersionManager {
       
       console.log(`Migration completed: ${sheetVersion} -> ${mcpVersion}`);
     }
+  }
+
+  private needsMigration(fromVersion: string, toVersion: string): boolean {
+    // 버전이 같으면 마이그레이션 불필요
+    if (fromVersion === toVersion) {
+      return false;
+    }
+
+    // 시맨틱 버전 파싱
+    const parseVersion = (version: string) => {
+      const parts = version.split('.').map(Number);
+      return {
+        major: parts[0] || 0,
+        minor: parts[1] || 0,
+        patch: parts[2] || 0
+      };
+    };
+
+    const from = parseVersion(fromVersion);
+    const to = parseVersion(toVersion);
+
+    // major 또는 minor 버전이 다르면 마이그레이션 필요
+    // patch 버전만 다르면 마이그레이션 불필요 (버그픽스)
+    return from.major !== to.major || from.minor !== to.minor;
   }
 
   private async getSchemaVersion(): Promise<string> {
@@ -123,13 +147,29 @@ class VersionManager {
   }
 
   private async executeMigration(fromVersion: string, toVersion: string): Promise<void> {
-    switch (`${fromVersion}->${toVersion}`) {
-      case "1.0.2->1.1.0":
-        await this.migrate_1_0_2_to_1_1_0();
-        break;
-      default:
-        throw new Error(`Unsupported migration: ${fromVersion} -> ${toVersion}`);
+    // 시맨틱 버전 파싱
+    const parseVersion = (version: string) => {
+      const parts = version.split('.').map(Number);
+      return {
+        major: parts[0] || 0,
+        minor: parts[1] || 0,
+        patch: parts[2] || 0
+      };
+    };
+
+    const from = parseVersion(fromVersion);
+    const to = parseVersion(toVersion);
+
+    // 스키마 변경이 필요한 마이그레이션만 실행
+    if (from.major === 1 && from.minor === 0 && to.major === 1 && to.minor >= 1) {
+      // 1.0.x -> 1.1.x+ 마이그레이션
+      await this.migrate_1_0_2_to_1_1_0();
     }
+    
+    // 향후 다른 major/minor 버전 마이그레이션이 필요하면 여기에 추가
+    // 예: if (from.major === 1 && from.minor === 1 && to.major === 1 && to.minor === 2) { ... }
+    
+    console.log(`Schema migration completed from ${fromVersion} to ${toVersion}`);
   }
 
   private async migrate_1_0_2_to_1_1_0(): Promise<void> {
