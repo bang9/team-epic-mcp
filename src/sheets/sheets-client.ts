@@ -32,14 +32,14 @@ class VersionManager {
     const sheetVersion = await this.getSchemaVersion();
 
     if (sheetVersion !== mcpVersion) {
-      console.log(`🔄 스키마 마이그레이션 시작: ${sheetVersion} → ${mcpVersion}`);
+      console.log(`Schema migration started: ${sheetVersion} -> ${mcpVersion}`);
       
       await this.executeMigration(sheetVersion, mcpVersion);
       await this.updateSchemaVersion(mcpVersion);
       
       VersionManager.migrationComplete = true;
       
-      console.log(`✅ 마이그레이션 완료: ${sheetVersion} → ${mcpVersion}`);
+      console.log(`Migration completed: ${sheetVersion} -> ${mcpVersion}`);
     }
   }
 
@@ -56,9 +56,24 @@ class VersionManager {
       VersionManager.sheetVersionCache = version;
       return version;
     } catch (error) {
-      // _Metadata 시트가 없으면 생성하고 기본 버전 반환
-      await this.createMetadataSheet();
-      return "1.0.2";
+      console.error("Failed to fetch _Metadata sheet:", error);
+      try {
+        // _Metadata 시트가 없으면 생성하고 기본 스키마 버전 주입
+        console.log("Creating _Metadata sheet and injecting initial schema version...");
+        await this.createMetadataSheet();
+        
+        // 생성 후 기본 버전(1.0.2)으로 설정하여 마이그레이션이 진행되도록 함
+        const initialVersion = "1.0.2";
+        VersionManager.sheetVersionCache = initialVersion;
+        
+        console.log(`_Metadata sheet created with initial schema version: ${initialVersion}`);
+        return initialVersion;
+      } catch (createError) {
+        console.error("Failed to create _Metadata sheet:", createError);
+        // 메타데이터 시트 생성에 실패해도 기본 버전으로 계속 진행
+        VersionManager.sheetVersionCache = "1.0.2";
+        return "1.0.2";
+      }
     }
   }
 
@@ -113,20 +128,20 @@ class VersionManager {
         await this.migrate_1_0_2_to_1_1_0();
         break;
       default:
-        throw new Error(`지원하지 않는 마이그레이션: ${fromVersion} → ${toVersion}`);
+        throw new Error(`Unsupported migration: ${fromVersion} -> ${toVersion}`);
     }
   }
 
   private async migrate_1_0_2_to_1_1_0(): Promise<void> {
-    console.log("📋 1.0.2 → 1.1.0 마이그레이션 시작...");
+    console.log("Starting 1.0.2 -> 1.1.0 migration...");
     
     try {
       // 1. Epics 시트에 created_quarter 컬럼 추가
-      console.log("1. Epics 시트에 created_quarter 컬럼 추가 중...");
+      console.log("1. Adding created_quarter column to Epics sheet...");
       await this.addCreatedQuarterColumn();
       
       // 2. 기존 Epic들에 생성 분기 추정 및 할당
-      console.log("2. 기존 Epic들에 생성 분기 할당 중...");
+      console.log("2. Assigning quarters to existing epics...");
       const epics = await this.sheetsClient.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS, -1);
       const statusUpdates = await this.sheetsClient.fetchSheetData<StatusUpdate>(CONFIG.SHEET_NAMES.STATUS_UPDATES, -1);
       
@@ -139,7 +154,7 @@ class VersionManager {
       }
       
       // 3. 필요한 분기별 시트들 생성
-      console.log("3. 분기별 Status_Updates 시트 생성 중...");
+      console.log("3. Creating quarterly Status_Updates sheets...");
       const requiredQuarters = [...new Set(quarterAssignments.values())];
       for (const quarter of requiredQuarters) {
         const sheetName = getStatusUpdatesSheetName(quarter);
@@ -147,17 +162,17 @@ class VersionManager {
       }
       
       // 4. 모든 Status_Updates를 분기별로 이동
-      console.log("4. Status_Updates 데이터를 분기별로 이동 중...");
+      console.log("4. Migrating Status_Updates data to quarterly sheets...");
       await this.migrateStatusUpdates(statusUpdates, quarterAssignments);
       
       // 5. 기존 Status_Updates 시트 비우기
-      console.log("5. 기존 Status_Updates 시트 정리 중...");
+      console.log("5. Clearing legacy Status_Updates sheet...");
       await this.clearStatusUpdatesSheet();
       
-      console.log("✅ 1.0.2 → 1.1.0 마이그레이션 완료!");
+      console.log("1.0.2 -> 1.1.0 migration completed successfully!");
       
     } catch (error) {
-      console.error("❌ 마이그레이션 실패:", error);
+      console.error("Migration failed:", error);
       throw error;
     }
   }
@@ -215,6 +230,8 @@ class VersionManager {
   }
 
   private async migrateStatusUpdates(statusUpdates: StatusUpdate[], quarterAssignments: Map<string, string>): Promise<void> {
+    console.log(`Processing ${statusUpdates.length} status updates for migration...`);
+    
     // 분기별로 그룹화
     const updatesByQuarter = new Map<string, StatusUpdate[]>();
     
@@ -228,9 +245,10 @@ class VersionManager {
       }
     }
     
-    // 각 분기별 시트에 데이터 추가
+    // 각 분기별 시트에 데이터 추가 (배치 처리로 메모리 사용량 최적화)
     for (const [quarter, updates] of updatesByQuarter) {
       const sheetName = getStatusUpdatesSheetName(quarter);
+      console.log(`Migrating ${updates.length} updates to ${sheetName}...`);
       
       // 헤더 먼저 추가
       await this.sheetsClient.updateValues(
@@ -238,20 +256,38 @@ class VersionManager {
         [["timestamp", "epic_id", "update_type", "platform", "message", "author"]]
       );
       
-      // 데이터 추가
+      // 데이터를 배치로 나누어 처리 (메모리 사용량 제한)
       if (updates.length > 0) {
-        const rows = updates.map(update => [
-          update.timestamp,
-          update.epic_id,
-          update.update_type,
-          update.platform || "",
-          update.message,
-          update.author
-        ]);
+        const BATCH_SIZE = 1000; // 배치 크기 제한
+        const batches = [];
         
-        await this.sheetsClient.appendValues(`${sheetName}!A:F`, rows);
+        for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+          const batch = updates.slice(i, i + BATCH_SIZE);
+          const rows = batch.map(update => [
+            update.timestamp,
+            update.epic_id,
+            update.update_type,
+            update.platform || "",
+            update.message,
+            update.author
+          ]);
+          batches.push(rows);
+        }
+        
+        // 각 배치를 순차적으로 처리
+        for (let i = 0; i < batches.length; i++) {
+          console.log(`Processing batch ${i + 1}/${batches.length} for ${sheetName}...`);
+          await this.sheetsClient.appendValues(`${sheetName}!A:F`, batches[i]);
+          
+          // 메모리 정리를 위한 짧은 대기
+          if (batches.length > 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
       }
     }
+    
+    console.log("Status updates migration completed.");
   }
 
   private async clearStatusUpdatesSheet(): Promise<void> {
