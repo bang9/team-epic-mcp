@@ -275,9 +275,9 @@ Epic이 성공적으로 생성되었습니다. 스프레드시트에서 확인�
         }
 
         const data = await client.fetchAllData();
-        
+
         // Epic 존재 여부 확인
-        const epic = data.epics.find(e => e.epic_id === epicId);
+        const epic = data.epics.find((e) => e.epic_id === epicId);
         if (!epic) {
           return {
             content: [

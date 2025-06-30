@@ -17,7 +17,6 @@ export const CONFIG = {
     METADATA: "Metadata",
   },
 
-
   // 캐시 설정
   CACHE_DURATION: parseInt(process.env.CACHE_DURATION || "60000"), // 기본 1분
 
@@ -29,12 +28,8 @@ export const CONFIG = {
 
 // 헬퍼 함수
 
-export function getApiUrl(range: string): string {
-  return `${CONFIG.SHEETS_API.BASE_URL}/${CONFIG.SPREADSHEET_ID}/values/${range}`;
-}
-
 // 버전 관리
-import packageJson from '../package.json' assert { type: 'json' };
+import packageJson from "../package.json" assert { type: "json" };
 
 export const MCP_VERSION = packageJson.version;
 

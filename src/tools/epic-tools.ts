@@ -1,9 +1,6 @@
 import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { SheetData, StatusUpdate } from "../types.js";
-import {
-  formatEpicWithStatus,
-  formatStatusUpdate,
-} from "../sheets/parser.js";
+import { formatEpicWithStatus, formatStatusUpdate } from "../sheets/parser.js";
 
 interface EpicTool extends Tool {
   handler: (data: SheetData, args: any) => any;

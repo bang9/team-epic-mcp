@@ -94,12 +94,10 @@ class TeamVisibilityMCPServer {
     try {
       await this.sheetsClient.checkAndMigrateIfNeeded();
     } catch (error) {
-      console.error('Migration check failed:', error);
+      console.error("Migration check failed:", error);
     }
   }
 }
 
 const server = new TeamVisibilityMCPServer();
 server.start().catch(console.error);
-
-

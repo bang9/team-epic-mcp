@@ -51,29 +51,3 @@ export function formatDate(dateString: string): string {
     minute: "2-digit",
   });
 }
-
-export function parseDate(dateString: string): Date {
-  return new Date(dateString);
-}
-
-export function getDaysUntil(dateString: string): number {
-  const targetDate = parseDate(dateString);
-  const today = new Date();
-  const diffTime = targetDate.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-}
-
-export function calculateOverallProgress(status: EpicStatus): number {
-  return Math.round(
-    (status.ios_progress + status.android_progress + status.js_progress) / 3,
-  );
-}
-
-export function getPlatformName(platform: "iOS" | "Android" | "JS"): string {
-  const names = {
-    iOS: "iOS",
-    Android: "Android",
-    JS: "JavaScript",
-  };
-  return names[platform] || platform;
-}
