@@ -275,18 +275,19 @@ Epic이 성공적으로 생성되었습니다. 스프레드시트에서 확인�
         }
 
         const data = await client.fetchAllData();
-        const currentStatus = data.epicStatuses.find(
-          (s) => s.epic_id === epicId,
-        ) || {
-          epic_id: epicId,
-          ios_progress: 0,
-          android_progress: 0,
-          js_progress: 0,
-          overall_status: "",
-          last_comment: "",
-          last_updated: "",
-          updated_by: "",
-        };
+        
+        // Epic 존재 여부 확인
+        const epic = data.epics.find(e => e.epic_id === epicId);
+        if (!epic) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `❌ Epic ${epicId}를 찾을 수 없습니다.`,
+              },
+            ],
+          };
+        }
 
         // 플랫폼별 진행률 업데이트
         const updates: any = {

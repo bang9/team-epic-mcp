@@ -199,7 +199,7 @@ export const epicReadTools: EpicTool[] = [
       type: "object",
       properties: {},
     },
-    handler: (data: SheetData, args: any) => {
+    handler: (data: SheetData, _args: any) => {
       const activeEpics = data.epics.filter(
         (e) =>
           !["backlog", "done", "released", "on_hold"].includes(
@@ -288,7 +288,7 @@ export const epicReadTools: EpicTool[] = [
       type: "object",
       properties: {},
     },
-    handler: (data: SheetData, args: any) => {
+    handler: (data: SheetData, _args: any) => {
       // 모든 블로커 찾기
       const blockersByEpic: Record<string, StatusUpdate[]> = {};
 

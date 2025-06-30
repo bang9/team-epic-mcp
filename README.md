@@ -91,6 +91,9 @@ MCP 클라이언트 설정 예시:
 "팀 전체 진행 상황 요약해줘" → 한눈에 보는 대시보드
 매주 보고서 작성 시간 단축
 
+### ⚡ **확장 가능한 성능**
+분기별 자동 파티셔닝으로 데이터가 늘어나도 성능 저하 없음
+
 ### 🔄 **자동 히스토리 관리**
 모든 업데이트가 자동으로 기록되고 추적 가능
 "언제 누가 뭘 바꿨는지" 더 이상 찾아다니지 않아도 됨
@@ -121,13 +124,13 @@ backlog → kickoff → planning → development → code_review → testing →
 
 ---
 
-## 📋 설치 가이드
+## 📋 설치 가이드 (신규 사용자)
 
 ### 1. Google Sheets 준비
 
 **스프레드시트 생성 및 구조 설정**
 
-새 Google Sheets를 생성하고 다음 3개 시트를 만드세요:
+새 Google Sheets를 생성하고 다음 기본 시트들을 만드세요:
 
 #### 📋 **Epics** (프로젝트 기본 정보)
 ```
@@ -280,6 +283,8 @@ npm run lint         # ESLint 코드 검사
 team-epic-mcp/
 ├── src/
 │   ├── index.ts              # MCP 서버 진입점
+│   ├── config.ts             # 설정 및 유틸리티
+│   ├── types.ts              # 타입 정의
 │   ├── tools/                # MCP 도구들
 │   │   ├── epic-tools.ts     # 읽기 도구
 │   │   └── epic-write-tools.ts # 쓰기 도구  

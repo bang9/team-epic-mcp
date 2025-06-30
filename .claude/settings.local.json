@@ -54,7 +54,9 @@
       "mcp__team-epic__change_epic_status",
       "mcp__team-epic__report_blocker",
       "mcp__team-epic__resolve_blocker",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm pkg:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }

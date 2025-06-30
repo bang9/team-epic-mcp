@@ -31,6 +31,7 @@ export interface Epic {
   target_date: string;
   prd_link?: string;
   tip_link?: string;
+  created_quarter?: string;
 }
 
 export interface EpicStatus {

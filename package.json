@@ -1,6 +1,6 @@
 {
   "name": "team-epic-mcp",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "MCP server for team project visibility using Google Sheets",
   "type": "module",
   "main": "dist/team-epic-mcp.js",
