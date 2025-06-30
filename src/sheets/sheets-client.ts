@@ -1,7 +1,5 @@
 import { google, sheets_v4 } from "googleapis";
-import axios from "axios";
-import { parse } from "csv-parse/sync";
-import { CONFIG, getExportUrl, MCP_VERSION, getCurrentQuarter, dateToQuarter, getStatusUpdatesSheetName } from "../config";
+import { CONFIG, MCP_VERSION, getCurrentQuarter, dateToQuarter, getStatusUpdatesSheetName } from "../config";
 import { SheetData, Epic, EpicStatus, StatusUpdate } from "../types";
 
 interface MetadataRow {
@@ -74,7 +72,7 @@ class VersionManager {
 
     try {
       // 무한루프 방지: fetchSheetData 직접 호출 (마이그레이션 체크 없이)
-      const metadata = await this.sheetsClient.fetchSheet<MetadataRow>(CONFIG.SHEET_NAMES.METADATA, -1);
+      const metadata = await this.sheetsClient.fetchSheet<MetadataRow>(CONFIG.SHEET_NAMES.METADATA);
       const versionRow = metadata.find(row => row.key === "schema_version");
       
       const version = versionRow?.value || "1.0.2";
@@ -139,7 +137,7 @@ class VersionManager {
   private async upsertMetadata(key: string, value: string): Promise<void> {
     try {
       // 무한루프 방지: fetchSheet 직접 호출 (마이그레이션 체크 없이)
-      const metadata = await this.sheetsClient.fetchSheet<MetadataRow>(CONFIG.SHEET_NAMES.METADATA, -1);
+      const metadata = await this.sheetsClient.fetchSheet<MetadataRow>(CONFIG.SHEET_NAMES.METADATA);
       const existingIndex = metadata.findIndex(row => row.key === key);
       
       const newRow = [key, value, new Date().toISOString()];
@@ -194,8 +192,8 @@ class VersionManager {
       
       // 2. 기존 Epic들에 생성 분기 추정 및 할당
       console.error("2. Assigning quarters to existing epics...");
-      const epics = await this.sheetsClient.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS, -1);
-      const statusUpdates = await this.sheetsClient.fetchSheetData<StatusUpdate>(CONFIG.SHEET_NAMES.STATUS_UPDATES, -1);
+      const epics = await this.sheetsClient.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS);
+      const statusUpdates = await this.sheetsClient.fetchSheetData<StatusUpdate>(CONFIG.SHEET_NAMES.STATUS_UPDATES);
       
       const quarterAssignments = new Map<string, string>();
       
@@ -281,7 +279,7 @@ class VersionManager {
 
   private async updateEpicQuarter(epicId: string, quarter: string): Promise<void> {
     try {
-      const epics = await this.sheetsClient.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS, -1);
+      const epics = await this.sheetsClient.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS);
       const rowIndex = epics.findIndex(e => e.epic_id === epicId);
       
       if (rowIndex >= 0) {
@@ -377,7 +375,6 @@ export class GoogleSheetsClient {
   private versionManager: VersionManager;
 
   constructor() {
-    // Service Account 인증 설정
     this.initializeAuth();
     this.sheets = google.sheets({ version: "v4", auth: this.auth });
     this.versionManager = new VersionManager(this);
@@ -386,37 +383,33 @@ export class GoogleSheetsClient {
   private initializeAuth() {
     const base64Credentials = CONFIG.GOOGLE_SERVICE_ACCOUNT_BASE64;
 
-    if (base64Credentials) {
-      try {
-        // base64 디코딩
-        const credentialsJson = Buffer.from(
-          base64Credentials,
-          "base64",
-        ).toString("utf-8");
-        const credentials = JSON.parse(credentialsJson);
-
-        // GoogleAuth 설정
-        this.auth = new google.auth.GoogleAuth({
-          credentials: credentials,
-          scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-        });
-
-        console.error("Service Account authentication initialized successfully");
-      } catch (error) {
-        console.error(
-          "Failed to initialize Service Account authentication:",
-          error,
-        );
-        throw new Error(
-          "Invalid GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable. Please ensure it contains a valid base64-encoded Service Account JSON.",
-        );
-      }
-    } else {
-      // 읽기 전용 모드 (인증 없음)
-      console.warn(
-        "No Service Account credentials found. Operating in read-only mode.",
+    if (!base64Credentials) {
+      throw new Error(
+        "GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable is required. Service Account authentication is mandatory.",
       );
-      this.auth = null;
+    }
+
+    try {
+      const credentialsJson = Buffer.from(
+        base64Credentials,
+        "base64",
+      ).toString("utf-8");
+      const credentials = JSON.parse(credentialsJson);
+
+      this.auth = new google.auth.GoogleAuth({
+        credentials: credentials,
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+      });
+
+      console.error("Service Account authentication initialized successfully");
+    } catch (error) {
+      console.error(
+        "Failed to initialize Service Account authentication:",
+        error,
+      );
+      throw new Error(
+        "Invalid GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable. Please ensure it contains a valid base64-encoded Service Account JSON.",
+      );
     }
   }
 
@@ -428,144 +421,85 @@ export class GoogleSheetsClient {
       return this.cache;
     }
 
-    // Service Account가 있으면 batchGet 사용
-    if (this.auth) {
-      try {
-        // 기본 시트 데이터 가져오기
-        const response = await this.sheets.spreadsheets.values.batchGet({
-          spreadsheetId: CONFIG.SPREADSHEET_ID,
-          ranges: [
-            `${CONFIG.SHEET_NAMES.EPICS}!A:Z`,
-            `${CONFIG.SHEET_NAMES.EPIC_STATUS}!A:Z`,
-          ],
-        });
-
-        const valueRanges = response.data.valueRanges || [];
-        
-        // 각 시트 데이터 파싱
-        const epics = this.parseSheetData<Epic>(valueRanges[0]?.values || []);
-        const epicStatuses = this.parseSheetData<EpicStatus>(valueRanges[1]?.values || []);
-        
-        // 완료되지 않은 에픽들의 created_quarter를 기준으로 상태 업데이트 가져오기
-        const incompleteEpics = epics.filter(epic => epic.current_status !== 'done' && epic.current_status !== 'released');
-        const uniqueQuarters = [...new Set(incompleteEpics.map(epic => epic.created_quarter).filter(Boolean))];
-        
-        let statusUpdates: StatusUpdate[] = [];
-        const fetchedQuarters = new Set<string>();
-        
-        // 각 분기별로 상태 업데이트 가져오기
-        for (const quarter of uniqueQuarters) {
-          const quarterSheet = getStatusUpdatesSheetName(quarter);
-          try {
-            const quarterResponse = await this.sheets.spreadsheets.values.get({
-              spreadsheetId: CONFIG.SPREADSHEET_ID,
-              range: `${quarterSheet}!A:Z`,
-            });
-            const quarterStatusUpdates = this.parseSheetData<StatusUpdate>(quarterResponse.data.values || []);
-            statusUpdates.push(...quarterStatusUpdates);
-            fetchedQuarters.add(quarter!);
-          } catch (error) {
-            console.warn(`Could not fetch ${quarterSheet}:`, error);
-          }
-        }
-        
-        // 현재 분기 상태 업데이트도 추가 (새로운 에픽들을 위해) - 중복 방지
-        const currentQuarter = getCurrentQuarter();
-        if (!fetchedQuarters.has(currentQuarter)) {
-          const currentQuarterSheet = getStatusUpdatesSheetName();
-          try {
-            const currentResponse = await this.sheets.spreadsheets.values.get({
-              spreadsheetId: CONFIG.SPREADSHEET_ID,
-              range: `${currentQuarterSheet}!A:Z`,
-            });
-            const currentQuarterStatusUpdates = this.parseSheetData<StatusUpdate>(currentResponse.data.values || []);
-            statusUpdates.push(...currentQuarterStatusUpdates);
-          } catch (error) {
-            console.warn(`Could not fetch current quarter ${currentQuarterSheet}:`, error);
-          }
-        }
-        
-        // 레거시 Status_Updates 시트도 확인 (마이그레이션 전 데이터)
-        try {
-          const legacyResponse = await this.sheets.spreadsheets.values.get({
-            spreadsheetId: CONFIG.SPREADSHEET_ID,
-            range: `${CONFIG.SHEET_NAMES.STATUS_UPDATES}!A:Z`,
-          });
-          const legacyUpdates = this.parseSheetData<StatusUpdate>(legacyResponse.data.values || []);
-          statusUpdates.push(...legacyUpdates);
-        } catch (legacyError) {
-          console.warn("Could not fetch legacy Status_Updates:", legacyError);
-        }
-
-        this.cache = {
-          epics,
-          epicStatuses,
-          statusUpdates,
-        };
-        this.cacheTimestamp = now;
-
-        return this.cache;
-      } catch (error) {
-        console.error("Failed to batch fetch sheets:", error);
-        // 에러 시 개별 요청으로 폴백
-      }
-    }
-
-    // Service Account가 없거나 batchGet 실패 시 개별 요청
-    const currentQuarterSheet = getStatusUpdatesSheetName();
-    
-    const [epics, epicStatuses] = await Promise.all([
-      this.fetchSheet<Epic>("Epics", CONFIG.SHEET_GIDS.EPICS),
-      this.fetchSheet<EpicStatus>("Epic_Status", CONFIG.SHEET_GIDS.EPIC_STATUS),
-    ]);
-    
-    // 완료되지 않은 에픽들의 created_quarter를 기준으로 상태 업데이트 가져오기
-    const incompleteEpics = epics.filter(epic => epic.current_status !== 'done' && epic.current_status !== 'released');
-    const uniqueQuarters = [...new Set(incompleteEpics.map(epic => epic.created_quarter).filter(Boolean))];
-    
-    let statusUpdates: StatusUpdate[] = [];
-    
-    // 각 분기별로 상태 업데이트 가져오기
-    const fetchedQuarters = new Set<string>();
-    
-    for (const quarter of uniqueQuarters) {
-      const quarterSheet = getStatusUpdatesSheetName(quarter);
-      try {
-        const quarterStatusUpdates = await this.fetchSheet<StatusUpdate>(quarterSheet, -1);
-        statusUpdates.push(...quarterStatusUpdates);
-        fetchedQuarters.add(quarter!);
-      } catch (error) {
-        console.warn(`Could not fetch ${quarterSheet}:`, error);
-      }
-    }
-    
-    // 현재 분기 상태 업데이트도 추가 (새로운 에픽들을 위해) - 중복 방지
-    const currentQuarter = getCurrentQuarter();
-    if (!fetchedQuarters.has(currentQuarter)) {
-      try {
-        const currentQuarterStatusUpdates = await this.fetchSheet<StatusUpdate>(currentQuarterSheet, -1);
-        statusUpdates.push(...currentQuarterStatusUpdates);
-      } catch (error) {
-        console.warn(`Could not fetch current quarter ${currentQuarterSheet}:`, error);
-      }
-    }
-    
-    // 레거시 Status_Updates 시트도 확인 (마이그레이션 전 데이터)
     try {
-      const legacyStatusUpdates = await this.fetchSheet<StatusUpdate>("Status_Updates", CONFIG.SHEET_GIDS.STATUS_UPDATES);
-      statusUpdates.push(...legacyStatusUpdates);
-    } catch (legacyError) {
-      console.warn("Could not fetch legacy Status_Updates:", legacyError);
+      // 기본 시트 데이터 가져오기
+      const response = await this.sheets.spreadsheets.values.batchGet({
+        spreadsheetId: CONFIG.SPREADSHEET_ID,
+        ranges: [
+          `${CONFIG.SHEET_NAMES.EPICS}!A:Z`,
+          `${CONFIG.SHEET_NAMES.EPIC_STATUS}!A:Z`,
+        ],
+      });
+
+      const valueRanges = response.data.valueRanges || [];
+      
+      // 각 시트 데이터 파싱
+      const epics = this.parseSheetData<Epic>(valueRanges[0]?.values || []);
+      const epicStatuses = this.parseSheetData<EpicStatus>(valueRanges[1]?.values || []);
+      
+      // 완료되지 않은 에픽들의 created_quarter를 기준으로 상태 업데이트 가져오기
+      const incompleteEpics = epics.filter(epic => epic.current_status !== 'done' && epic.current_status !== 'released');
+      const uniqueQuarters = [...new Set(incompleteEpics.map(epic => epic.created_quarter).filter(Boolean))];
+      
+      let statusUpdates: StatusUpdate[] = [];
+      const fetchedQuarters = new Set<string>();
+      
+      // 각 분기별로 상태 업데이트 가져오기
+      for (const quarter of uniqueQuarters) {
+        const quarterSheet = getStatusUpdatesSheetName(quarter);
+        try {
+          const quarterResponse = await this.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SPREADSHEET_ID,
+            range: `${quarterSheet}!A:Z`,
+          });
+          const quarterStatusUpdates = this.parseSheetData<StatusUpdate>(quarterResponse.data.values || []);
+          statusUpdates.push(...quarterStatusUpdates);
+          fetchedQuarters.add(quarter!);
+        } catch (error) {
+          console.warn(`Could not fetch ${quarterSheet}:`, error);
+        }
+      }
+      
+      // 현재 분기 상태 업데이트도 추가 (새로운 에픽들을 위해) - 중복 방지
+      const currentQuarter = getCurrentQuarter();
+      if (!fetchedQuarters.has(currentQuarter)) {
+        const currentQuarterSheet = getStatusUpdatesSheetName();
+        try {
+          const currentResponse = await this.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SPREADSHEET_ID,
+            range: `${currentQuarterSheet}!A:Z`,
+          });
+          const currentQuarterStatusUpdates = this.parseSheetData<StatusUpdate>(currentResponse.data.values || []);
+          statusUpdates.push(...currentQuarterStatusUpdates);
+        } catch (error) {
+          console.warn(`Could not fetch current quarter ${currentQuarterSheet}:`, error);
+        }
+      }
+      
+      // 레거시 Status_Updates 시트도 확인 (마이그레이션 전 데이터)
+      try {
+        const legacyResponse = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: CONFIG.SPREADSHEET_ID,
+          range: `${CONFIG.SHEET_NAMES.STATUS_UPDATES}!A:Z`,
+        });
+        const legacyUpdates = this.parseSheetData<StatusUpdate>(legacyResponse.data.values || []);
+        statusUpdates.push(...legacyUpdates);
+      } catch (legacyError) {
+        console.warn("Could not fetch legacy Status_Updates:", legacyError);
+      }
+
+      this.cache = {
+        epics,
+        epicStatuses,
+        statusUpdates,
+      };
+      this.cacheTimestamp = now;
+
+      return this.cache;
+    } catch (error) {
+      console.error("Failed to fetch sheets:", error);
+      throw error;
     }
-
-    this.cache = {
-      epics,
-      epicStatuses,
-      statusUpdates,
-    };
-    this.cacheTimestamp = now;
-
-    return this.cache;
   }
 
   private parseSheetData<T>(rows: any[][]): T[] {
@@ -593,51 +527,18 @@ export class GoogleSheetsClient {
     return records as T[];
   }
 
-  public async fetchSheet<T>(sheetName: string, gid: number): Promise<T[]> {
+  public async fetchSheet<T>(sheetName: string): Promise<T[]> {
     try {
-      // Service Account가 있으면 Sheets API 사용, 없으면 CSV export 사용
-      if (this.auth) {
-        // Google Sheets API 사용
-        const response = await this.sheets.spreadsheets.values.get({
-          spreadsheetId: CONFIG.SPREADSHEET_ID,
-          range: `${sheetName}!A:Z`, // 모든 열 읽기
-        });
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: CONFIG.SPREADSHEET_ID,
+        range: `${sheetName}!A:Z`,
+      });
 
-        const rows = response.data.values || [];
-        return this.parseSheetData<T>(rows);
-      } else {
-        // 기존 CSV export 방식 (읽기 전용)
-        const url = getExportUrl(gid);
-        const response = await axios.get(url);
-
-        const records = parse(response.data, {
-          columns: true,
-          skip_empty_lines: true,
-          trim: true,
-          cast: (value, context) => {
-            // 숫자 변환
-            if (
-              context.column === "ios_progress" ||
-              context.column === "android_progress" ||
-              context.column === "js_progress"
-            ) {
-              return parseInt(value) || 0;
-            }
-            // boolean 변환
-            if (context.column === "is_carry_over") {
-              return value.toLowerCase() === "true";
-            }
-            return value;
-          },
-        });
-
-        return records as T[];
-      }
+      const rows = response.data.values || [];
+      return this.parseSheetData<T>(rows);
     } catch (error: any) {
       console.error(`Failed to fetch ${sheetName} sheet:`, error);
       
-      // 시트가 존재하지 않는 경우나 중요한 에러는 다시 throw하여 
-      // 상위 함수에서 적절히 처리할 수 있도록 함
       if (error.message && (
         error.message.includes('Unable to parse range') ||
         error.message.includes('not found') ||
@@ -652,13 +553,6 @@ export class GoogleSheetsClient {
 
   // 쓰기 작업을 위한 메서드들
   async updateValues(range: string, values: any[][]): Promise<boolean> {
-    
-    // Service Account가 없으면 오류 반환
-    if (!this.auth) {
-      throw new Error(
-        "Write operations require Service Account authentication. Please set GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable.",
-      );
-    }
 
     try {
       const response = await this.sheets.spreadsheets.values.update({
@@ -700,13 +594,6 @@ export class GoogleSheetsClient {
   }
 
   async appendValues(range: string, values: any[][]): Promise<boolean> {
-    
-    // Service Account가 없으면 오류 반환
-    if (!this.auth) {
-      throw new Error(
-        "Write operations require Service Account authentication. Please set GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable.",
-      );
-    }
 
     try {
       console.error("Attempting to append values to:", range);
@@ -831,7 +718,7 @@ export class GoogleSheetsClient {
   private async getTargetSheetForUpdate(epicId: string): Promise<string> {
     try {
       // Epic 정보를 조회해서 created_quarter 확인
-      const epics = await this.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS, -1);
+      const epics = await this.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS);
       const epic = epics.find(e => e.epic_id === epicId);
       
       if (epic && epic.created_quarter) {
@@ -994,8 +881,8 @@ export class GoogleSheetsClient {
   }
 
   // Public wrapper for fetchSheet (for VersionManager)
-  async fetchSheetData<T>(sheetName: string, gid: number = -1): Promise<T[]> {
-    return this.fetchSheet<T>(sheetName, gid);
+  async fetchSheetData<T>(sheetName: string): Promise<T[]> {
+    return this.fetchSheet<T>(sheetName);
   }
 
   // 특정 Epic의 히스토리 조회 (분기별 시트에서)
@@ -1003,17 +890,17 @@ export class GoogleSheetsClient {
     
     try {
       // Epic 정보 조회해서 created_quarter 확인
-      const epics = await this.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS, -1);
+      const epics = await this.fetchSheetData<Epic>(CONFIG.SHEET_NAMES.EPICS);
       const epic = epics.find(e => e.epic_id === epicId);
       
       if (epic && epic.created_quarter) {
         // 마이그레이션 완료된 Epic: 해당 분기 시트에서 조회
         const sheetName = getStatusUpdatesSheetName(epic.created_quarter);
-        const allUpdates = await this.fetchSheetData<StatusUpdate>(sheetName, -1);
+        const allUpdates = await this.fetchSheetData<StatusUpdate>(sheetName);
         return allUpdates.filter(u => u.epic_id === epicId);
       } else {
         // 기존 Epic: 기존 시트에서 조회
-        const allUpdates = await this.fetchSheetData<StatusUpdate>(CONFIG.SHEET_NAMES.STATUS_UPDATES, -1);
+        const allUpdates = await this.fetchSheetData<StatusUpdate>(CONFIG.SHEET_NAMES.STATUS_UPDATES);
         return allUpdates.filter(u => u.epic_id === epicId);
       }
     } catch (error) {
@@ -1024,10 +911,6 @@ export class GoogleSheetsClient {
 
   // 시트 존재 여부 확인
   async sheetExists(sheetName: string): Promise<boolean> {
-    if (!this.auth) {
-      // Service Account가 없으면 정확한 확인 불가, false 리턴
-      return false;
-    }
 
     try {
       const response = await this.sheets.spreadsheets.get({
@@ -1044,11 +927,6 @@ export class GoogleSheetsClient {
 
   // 새 시트 생성
   async createSheet(sheetName: string): Promise<boolean> {
-    if (!this.auth) {
-      throw new Error(
-        "Write operations require Service Account authentication. Please set GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable.",
-      );
-    }
 
     try {
       const response = await this.sheets.spreadsheets.batchUpdate({
