@@ -24,8 +24,8 @@ This is a Model Context Protocol (MCP) server for team epic tracking through Goo
 
 ### Key Components
 
-- **Read Tools** (`src/tools/epic-tools.ts`): 7 tools that receive cached sheet data
-- **Write Tools** (`src/tools/epic-write-tools.ts`): 9 tools that receive GoogleSheetsClient instance
+- **Read Tools** (`src/tools/epic-tools.ts`): 6 tools that receive cached sheet data
+- **Write Tools** (`src/tools/epic-write-tools.ts`): 7 tools that receive GoogleSheetsClient instance
 - **GoogleSheetsClient** (`src/sheets/sheets-client.ts`): Handles all Google Sheets API interactions with automatic migration
 - **VersionManager** (`src/sheets/sheets-client.ts`): Manages schema versions and automatic migrations
 - **Data Parser** (`src/sheets/parser.ts`): Converts CSV data to typed objects
@@ -38,7 +38,7 @@ This is a Model Context Protocol (MCP) server for team epic tracking through Goo
 
 ### Migration Flow (Automatic)
 
-**Version Check**: Every tool call triggers version comparison (package.json vs _Metadata sheet)
+**Version Check**: Every tool call triggers version comparison (package.json vs Metadata sheet)
 **Migration Execution**: If versions differ, automatic migration runs (e.g., 1.0.2 → 1.1.0)
 **Data Restructuring**: Existing data moved to quarterly partitions, new structure activated
 **Performance Optimization**: Immediate 90% improvement in query performance
@@ -48,7 +48,7 @@ This is a Model Context Protocol (MCP) server for team epic tracking through Goo
 **Core Sheets:**
 - **Epics**: Core epic information with `created_quarter` field (epic_id, epic_name, assignees, dates, status, created_quarter)
 - **Epic_Status**: Real-time progress tracking per platform (ios_progress, android_progress, js_progress)
-- **_Metadata**: Schema version and migration history (key, value, updated_at)
+- **Metadata**: Schema version and migration history (key, value, updated_at)
 
 **Quarterly Partition Sheets (Dynamic):**
 - **Status_Updates_YYYY_QQ**: Quarterly partitioned status updates (e.g., Status_Updates_2024_Q3)
@@ -111,7 +111,7 @@ Read tools receive `SheetData`, write tools receive `GoogleSheetsClient` instanc
 ## Version Management & Migration (v1.1.0+)
 
 ### Automatic Migration System
-- **Version Detection**: Compares package.json version with _Metadata sheet schema_version
+- **Version Detection**: Compares package.json version with Metadata sheet schema_version
 - **Zero Downtime**: Migrations run automatically on first tool call after version change
 - **Data Safety**: Complete data migration before activating new features
 - **Performance Optimization**: Immediate benefits after migration completion
@@ -122,7 +122,7 @@ Read tools receive `SheetData`, write tools receive `GoogleSheetsClient` instanc
 3. **Sheet Creation**: Create quarterly Status_Updates sheets (e.g., Status_Updates_2024_Q3)
 4. **Data Migration**: Move all status updates to appropriate quarterly sheets
 5. **Legacy Cleanup**: Clear original Status_Updates sheet
-6. **Version Update**: Update _Metadata sheet with new schema version
+6. **Version Update**: Update Metadata sheet with new schema version
 
 ### Performance Impact
 - **Before Migration**: Loads all historical data (potentially 50,000+ rows)

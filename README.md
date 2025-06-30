@@ -134,7 +134,7 @@ backlog → kickoff → planning → development → code_review → testing →
 
 #### 📋 **Epics** (프로젝트 기본 정보)
 ```
-epic_id | epic_name | epic_url | current_status | ios_assignee | android_assignee | js_assignee | start_date | target_date | prd_link | tip_link
+epic_id | epic_name | epic_url | current_status | ios_assignee | android_assignee | js_assignee | start_date | target_date | prd_link | tip_link | created_quarter
 ```
 
 #### 📊 **Epic_Status** (실시간 진행 상황)
@@ -290,7 +290,8 @@ team-epic-mcp/
 │   │   └── epic-write-tools.ts # 쓰기 도구  
 │   └── sheets/               # Google Sheets 연동
 │       ├── sheets-client.ts  # API 클라이언트
-│       └── parser.ts         # 데이터 파싱
+│       ├── parser.ts         # 데이터 파싱
+│       └── version-manager.ts # 스키마 버전 관리
 ├── sheets_data/              # 샘플 데이터
 └── dist/                     # 배포 파일
 ```

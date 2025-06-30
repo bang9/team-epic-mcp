@@ -51,7 +51,6 @@ export const epicReadTools: EpicTool[] = [
         );
       }
 
-      // Sprint filtering removed - Sprint_View no longer available
 
       const content =
         epics.length > 0
